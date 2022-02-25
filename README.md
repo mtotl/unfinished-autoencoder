@@ -10,6 +10,7 @@ autoencoder_test. py : for-loops runs a bunch of times and saves the result for 
 autoencoders.py : different configurations of autoencoders to be tested in -_test-script.
 
 autoencoder.py :  first autoencoder
+
 random_plotting : plots of the leaks
 
 
