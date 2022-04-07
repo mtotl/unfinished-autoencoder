@@ -224,6 +224,50 @@ class AutoEncoder_5(nn.Module):
         return x
 
 
+class AutoEncoder_6(nn.Module): #similar to AE_2, but added another layer
+    def __init__(self, length):
+        super().__init__()
+        self.lin1 = nn.Linear(length, 26)
+        self.lin2_bn = nn.BatchNorm1d(26)
+        self.lin2 = nn.Linear(26, 12)
+        self.lin3_bn = nn.BatchNorm1d(12)
+        self.lin3 = nn.Linear(12, 8)
+        self.lin4_bn = nn.BatchNorm1d(8)
+        self.lin4 = nn.Linear(8, 4)
+
+
+        self.lin5 = nn.Linear(4, 8)
+        self.lin6_bn = nn.BatchNorm1d(8)
+        self.lin6 = nn.Linear(8, 12)
+        self.lin7_bn = nn.BatchNorm1d(12)
+        self.lin7 = nn.Linear(12, 26)
+        self.lin8_bn = nn.BatchNorm1d(26)
+        self.lin8 = nn.Linear(26, length)
+
+        self.lin1.weight.data.uniform_(-2, 2)
+        self.lin2.weight.data.uniform_(-2, 2)
+        self.lin3.weight.data.uniform_(-2, 2)
+        self.lin4.weight.data.uniform_(-2, 2)
+
+        self.lin5.weight.data.uniform_(-2, 2)
+        self.lin6.weight.data.uniform_(-2, 2)
+        self.lin7.weight.data.uniform_(-2, 2)
+        self.lin8.weight.data.uniform_(-2, 2)
+
+    def forward(self, data):
+
+        x = torch.tanh(self.lin1(data))
+        x = torch.tanh(self.lin2(self.lin2_bn(x)))
+        x = torch.tanh(self.lin3(self.lin3_bn(x)))
+        x = torch.tanh(self.lin4(self.lin4_bn(x)))
+
+        x = torch.tanh(self.lin5(x))
+        x = torch.tanh(self.lin6(self.lin6_bn(x)))
+        x = torch.tanh(self.lin7(self.lin7_bn(x)))
+        x = torch.tanh(self.lin8(self.lin8_bn(x)))
+
+        return x
+
 
 def thresholding_algo(y, lag, threshold, influence):
     signals = np.zeros(len(y))
@@ -265,3 +309,60 @@ def ordered_cluster(data, max_diff):
             current_group = (item, )
     if current_group:
         yield current_group
+
+def get_jenks_breaks(data_list, number_class):
+    data_list.sort()
+    mat1 = []
+    for i in range(len(data_list) + 1):
+        temp = []
+        for j in range(number_class + 1):
+            temp.append(0)
+        mat1.append(temp)
+    mat2 = []
+    for i in range(len(data_list) + 1):
+        temp = []
+        for j in range(number_class + 1):
+            temp.append(0)
+        mat2.append(temp)
+    for i in range(1, number_class + 1):
+        mat1[1][i] = 1
+        mat2[1][i] = 0
+        for j in range(2, len(data_list) + 1):
+            mat2[j][i] = float('inf')
+    v = 0.0
+    for l in range(2, len(data_list) + 1):
+        s1 = 0.0
+        s2 = 0.0
+        w = 0.0
+        for m in range(1, l + 1):
+            i3 = l - m + 1
+            val = float(data_list[i3 - 1])
+            s2 += val * val
+            s1 += val
+            w += 1
+            v = s2 - (s1 * s1) / w
+            i4 = i3 - 1
+            if i4 != 0:
+                for j in range(2, number_class + 1):
+                    if mat2[l][j] >= (v + mat2[i4][j - 1]):
+                        mat1[l][j] = i3
+                        mat2[l][j] = v + mat2[i4][j - 1]
+        mat1[l][1] = 1
+        mat2[l][1] = v
+    k = len(data_list)
+    kclass = []
+    for i in range(number_class + 1):
+        kclass.append(min(data_list))
+    kclass[number_class] = float(data_list[len(data_list) - 1])
+    count_num = number_class
+    while count_num >= 2:  # print "rank = " + str(mat1[k][count_num])
+        idx = int((mat1[k][count_num]) - 2)
+        # print "val = " + str(data_list[idx])
+        kclass[count_num - 1] = data_list[idx]
+        k = int((mat1[k][count_num] - 1))
+        count_num -= 1
+    return kclass
+
+
+def get_timestep(x, time_df):
+    return time_df.loc[x]

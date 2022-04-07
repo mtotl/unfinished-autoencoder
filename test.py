@@ -1,6 +1,5 @@
-
 from sqlite3 import Timestamp
-from matplotlib import markers
+from matplotlib import container, markers
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,14 +12,11 @@ import pylab
 import math
 from random import randrange
 from statistics import mean
+from sklearn.cluster import KMeans
 
 
 from itertools import groupby
-
-
-
-from autoencoders_and_more import thresholding_algo, ordered_cluster
-
+from autoencoders_and_more import get_timestep, thresholding_algo, ordered_cluster, get_jenks_breaks
 
 import wntr
 
@@ -356,10 +352,10 @@ import wntr
 #   y = X.index[:103000]
 #   print(y)
 
-per_neuron = pd.read_csv('per_neuron_all_sensors.csv', parse_dates=True)
-random_data = pd.read_csv('test-res_test_v5.csv', parse_dates = True)
+# per_neuron = pd.read_csv('per_neuron_all_sensors.csv', parse_dates=True)
+# random_data = pd.read_csv('test-res_test_v5.csv', parse_dates = True)
 
-print(per_neuron)
+# print(per_neuron)
 # print(per_neuron)
 # res = per_neuron.drop(columns=['index'])
 
@@ -448,17 +444,6 @@ print(per_neuron)
 #     results = pd.concat([results, results_holder])
 
 # print(results)
-wn = wntr.network.WaterNetworkModel('temp.inp') 
-ax = wntr.graphics.plot_network(wn, node_attribute='elevation', node_colorbar_label='Elevation (m)')
-
-nodes = wn.nodes()
-
-y = wn.get_node('n216')
-#print(type(y))
-
-#only resulted in zeros, dunno why, fixed later with get_coordinates()
-# for col in per_neuron.columns:
-#     print(wntr.network.Junction(col, wn).coordinates)
 
 #from statsmodels.tsa.seasonal import STL
 
@@ -483,35 +468,662 @@ y = wn.get_node('n216')
 # fig = n458.rolling(288*5).mean().plot()
 # plt.show()
 
-def get_coordinates():
-    nodes = []
-    x_coord = []
-    y_coord = []
-    with open('coordinates.txt') as f:
-        line = f.readline()
-        while line:
-            line = f.readline()
-            a = line.split()
-            if len(a)> 0: 
-                nodes.append(a[0])
-                x_coord.append((float(a[1])))
-                y_coord.append((float(a[2])))
+# def get_coordinates():
+#     nodes = []
+#     x_coord = []
+#     y_coord = []
+#     with open('coordinates.txt') as f:
+#         line = f.readline()
+#         while line:
+#             line = f.readline()
+#             a = line.split()
+#             if len(a)> 0: 
+#                 nodes.append(a[0])
+#                 x_coord.append((float(a[1])))
+#                 y_coord.append((float(a[2])))
 
-    f.close()
+#     f.close()
 
-    coordinates = pd.DataFrame()
-    coordinates['nodes'] = nodes
-    coordinates['x'] = x_coord
-    coordinates['y'] = y_coord
-    #print(coordinates)
-    return coordinates
+#     coordinates = pd.DataFrame()
+#     coordinates['nodes'] = nodes
+#     coordinates['x'] = x_coord
+#     coordinates['y'] = y_coord
+#     #print(coordinates)
+#     return coordinates
+
+# #a = get_coordinates()
+
+# leak_data = [{'leak':'p232', 'start': 8610, 'stop': 10134}]
+# leak_df = pd.DataFrame(data = leak_data)
+# print(leak_df)
+
+a = [9406, 9407, 9408, 9409, 9410, 911, 9412, 9413, 9414, 9415, 9416, 9417, 9418, 9419, 9420, 9421, 9422, 9423, 9424, 9425, 9426, 9427, 9428, 9429, 9430, 9431, 9432, 9433, 9434, 9435, 9436, 9437, 9438, 9439, 9440, 9441, 9442, 9443, 9444, 9445, 9446, 9447, 9448, 9449, 9450, 9451, 9452, 9453, 9454, 9455, 9456, 9457, 9458, 9459, 9460, 9461, 9462, 9463, 9464, 9465, 9466, 9467, 9468, 9469, 9470, 9471, 9472, 9473, 9474, 9475, 9476, 9477, 9478, 9479, 9480, 9481, 9482, 9483, 9484, 9485, 9486, 9487, 9488, 9489, 9490, 9491, 9492, 9493, 9494, 9495, 9496, 9497, 9498, 9499, 9500, 9501, 9502, 9503, 9504, 9505, 9506, 9507, 9508, 9509, 9510, 9511, 9512, 9513, 9514, 9515, 9516, 9517, 9518, 9519, 9520, 9521, 9522, 9523, 9524, 9525, 9526, 9527, 9528, 9529, 9530, 9531, 9532, 9533, 9534, 9535, 9536, 9537, 9538, 9539, 9540, 9541, 9542, 9543, 9544, 9545, 9546, 9547, 9548, 9549, 9550, 9551, 9552, 9553, 9554, 9555, 9556, 9557, 9558, 9559, 9560, 9561, 9562, 9563, 9564, 9565, 9566, 9567, 9568, 9569, 9570, 9571, 9572, 9573, 9574, 9575, 9576, 9577, 9578, 9579, 9580, 9581, 9582, 9583, 9584, 9585, 9586, 9587, 9588, 9589, 9590, 9591, 9592, 9593, 9594, 9595, 9596, 9597, 9598, 9599, 9600, 9601, 9602, 9603, 9604, 9605, 9606, 9607, 9608, 9609, 9610, 9611, 9612, 9613, 9614, 9615, 9616, 9617, 9618, 9619, 9620, 9621, 9622, 9623, 9624, 9625, 9626, 9627, 9628, 9629, 9630, 9631, 9632, 9633, 9634, 9635, 9636, 9637, 9638, 9639, 9640, 9641, 9642, 9643, 9644, 9645, 9646, 9647, 9648, 9649, 9650, 9651, 9652, 9653, 9654, 9655, 9656, 9657, 9658, 9659, 9660, 9661, 9662, 9663, 9664, 9665, 9666, 9667, 9668, 9669, 9670, 9671, 9672, 9673, 9674, 9675, 9676, 9677, 9678, 9679, 9680, 9681, 9682, 9683, 9684, 9685, 9686, 9687, 9688, 9689, 9690, 9691, 9692, 9693, 9694, 9695, 9696, 9697, 9698, 9699, 9700, 9701, 9702, 9703, 9704, 9705, 9706, 9707, 9708, 9709, 9710, 9711, 9712, 9713, 9714, 9715, 9716, 9717, 9718, 9719, 9720, 9721, 9722, 9723, 9724, 9725, 9726, 9727, 9728, 9729, 9730, 9731, 9732, 9733, 9734, 9735, 9736, 9737, 9738, 9739, 9740, 9741, 9742, 9743, 9744, 9745, 9746, 9747, 9748, 9749, 9750, 9751, 9752, 9753, 9754, 9755, 9756, 9757, 9758, 9759, 9760, 9761, 9762, 9763, 9764, 9765, 9766, 9767, 9768, 9769, 9770, 9771, 9772, 9773, 9774, 9775, 9776, 9777, 9778, 9779, 9780, 9781, 9782, 9783, 9784, 9785, 9786, 9787, 9788, 9789, 9790, 9791, 9792, 9793, 9794, 9795, 9796, 9797, 9798, 9799, 9800, 9801, 9802, 9803, 9804, 9805, 9806, 9807, 9808, 9809, 9810, 9811, 9812, 9813, 9814, 9815, 9816, 9817, 9818, 9819, 9820, 9821, 9822, 9823, 9824, 9825, 9826, 9827, 9828, 9829, 9830, 9831, 9832, 9833, 9834, 9835, 9836, 9837, 9838, 9839, 9840, 9841, 9842, 9843, 9844, 9845, 9846, 9847, 9848, 9849, 9850, 9851, 9852, 9853, 9854, 9855, 9856, 9857, 9858, 9859, 9860, 9861, 9862, 9863, 9864, 9865, 9866, 9867, 9868, 9869, 9870, 9871, 9872, 9873, 9874, 9875, 9876, 9877, 9878, 9879, 9880, 9881, 9882, 9883, 9884, 9885, 9886, 9887, 9888, 9889, 9890, 9891, 9892, 9893, 9894, 9895, 9896, 9897, 9898, 9899, 9900, 9901, 9902, 9903, 9904, 9905, 9906, 9907, 9908, 9909, 9910, 9911, 9912, 9913, 9914, 9915, 9916, 9917, 9918, 9919, 9920, 9921, 9922, 9923, 9924, 9925, 9926, 9927, 9928, 9929, 9930, 9931, 9932, 9933, 9934, 9935, 9936, 9937, 9938, 9939, 9940, 9941, 9942, 9943, 9944, 9945, 9946, 9947, 9948, 9949, 9950, 9951, 9952, 9953, 9954, 9955, 9956, 9957, 9958, 9959, 9960, 9961, 9962, 9963, 9964, 9965, 9966, 9967, 9968, 9969, 9970, 9971, 9972, 9973, 9974, 9975, 9976, 9977, 9978, 9979, 9980, 9981, 9982, 9983, 9984, 9985, 9986, 9987, 9988, 9989, 9990, 9991, 9992, 9993, 9994, 9995, 9996, 9997, 9998, 9999, 10000, 10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008, 10009, 10010, 10011, 10012, 10013, 10014, 10015, 10016, 10017, 10018, 10019, 10020, 10021, 10022, 10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030, 10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038, 10039, 10040, 10041, 10042, 10043, 10044, 10045, 10046, 10047, 10048, 10049, 10050, 10051, 10052, 10053, 10054, 10055, 10056, 10057, 10058, 10059, 10060, 10061, 10062, 10063, 10064, 10065, 10066, 10067, 10068, 10069, 10070, 10071, 10072, 10073, 10074, 10075, 10076, 10077, 10078, 10079, 10080, 10081, 10082, 10083, 10084, 10085, 10086, 10087, 10088, 10089, 10090, 10091, 10092, 10093, 10094, 10095, 10096, 10097, 10098, 10099, 10100, 10101, 10102, 10103, 10104, 10105, 10106, 10107, 10108, 10109, 10110, 10111, 10112, 10113, 10114, 10115, 10116, 10117, 10118, 10119, 10120, 10121, 10122, 10123, 10124, 10125, 10126, 10127, 10128, 10129, 10130, 10131, 10132, 10133, 10134, 10135, 10136, 10137, 10138, 10139, 10140, 10141, 10142, 10143, 10144, 10145, 10146, 10147, 10148, 10149, 10150, 10151, 10152, 10153, 10154, 10155, 10156, 10157, 10158, 10159, 10160, 10161, 10162, 10163, 10164, 10165, 10166, 10167, 10168, 10169, 10170, 10171, 10172, 10173, 10174, 10175, 10176, 10177, 10178, 10179, 10180, 10181, 10182, 10183, 10184, 10185, 10186, 10187, 10188, 10189, 10190, 10191, 10192, 10193, 10194, 10195, 10196, 10197, 10198, 10199, 10200, 10201, 10202, 10203, 10204, 10205, 10206, 10207, 10208, 10209, 10210, 10211, 10212, 10213, 10214, 10215, 10216, 10217, 10218, 10219, 10220, 10221, 10222, 10223, 10224, 10225, 10226, 10227, 10228, 10229, 10230, 10231, 10232, 10233, 10234, 10235, 10236, 10237, 10238, 10239, 10240, 10241, 10242, 10243, 10244, 10245, 10246, 10247, 10248, 10249, 10250, 10251, 10252, 10253, 10254, 10255, 10256, 10257, 10258, 10259, 10260, 10261, 10262, 10263, 10264, 10265, 10266, 10267, 10268, 10269, 10270, 10271, 10272, 10273, 10274, 10275, 10276, 10277, 10278, 10279, 10280, 10281, 10282, 10283, 10284, 10285, 10286, 10287, 10288, 10289, 10290, 10291, 10292, 10293, 10294, 10295, 10296, 10297, 10298, 10299, 10300, 10301, 10302, 10303, 10304, 10305, 10306, 10307, 10308, 10309, 10310, 10311, 10312, 10313, 10314, 10315, 10316, 10317, 10318, 10319, 10320, 10321, 10322, 10323, 10324, 10325, 10326, 10327, 10328, 10329, 10330, 10331, 10332, 10333, 10334, 10335, 10336, 10337, 10338, 10339, 10340, 10341, 10342, 10343, 10344, 10345, 10346, 10347, 10348, 10349, 10350, 10351, 10352, 10353, 10354, 10355, 10356, 10357, 10358, 10359, 10360, 10361, 10362, 10363, 10364, 10365, 10366, 10367, 10368, 10369, 10370, 10371, 10372, 10373, 10374, 10375, 10376, 10377, 10378, 10379, 10380, 10381, 10382, 10383, 10384, 10385, 10386, 10387, 10388, 10389, 10390, 10391, 10392, 10393, 10394, 10395, 10396, 10397, 10398, 10399, 10400, 10401, 10402, 10403, 10404, 10405, 10406, 10407, 10408, 10409, 10410, 10411, 10412, 10413, 10414, 10415, 10416, 10417, 10418, 10419, 10420, 10421, 10422, 10423, 10424, 10425, 10426, 10427, 10428, 10429, 10430, 10431, 10432, 10433, 10434, 10435, 10436, 10437, 10438, 10439, 10440, 10441, 10442, 10443, 10444, 10445, 10446, 10447, 10448, 10449, 10450, 10451, 10452, 10453, 10454, 10455, 10456, 10457, 10458, 10459, 10460, 10461, 10462, 10463, 10464, 10465, 10466, 10467, 10468, 10469, 10470, 10471, 10472, 10473, 10474, 10475, 10476, 10477, 10478, 10479, 10480, 10481, 10482, 10483, 10484, 10485, 10486, 10487, 10488, 10489, 10490, 10491, 10492, 10493, 10494, 10495, 10496, 10497, 10498, 10499, 10500, 10501, 10502, 10503, 10504, 10505, 10506, 10507, 10508, 10509, 10510, 10511, 10512, 10513, 10514, 10515, 10516, 10517, 10518, 10519, 10520, 10521, 10522, 10523, 10524, 10525, 10526, 10527, 10528, 10529, 10530, 10531, 10532, 10533, 10534, 10535, 10536, 10537, 10538, 10539, 10540, 10541, 10542, 10543, 10544, 10545, 10546, 10547, 10548, 10549, 10550, 10551, 10552, 10553, 10554, 10555, 10556, 10557, 10558, 10559, 10560, 10561, 10562, 10563, 10564, 10565, 10566, 10567, 10568, 10569, 10570, 10571, 10572, 10573, 10574, 10575, 10576, 10577, 10578, 10579, 10580, 10581, 10582, 10583, 10584, 10585, 10586, 10587, 10588, 10589, 10590, 10591, 10592, 10593, 10594, 10595, 10596, 10597, 10598, 10599, 10600, 10601, 10602, 10603, 10604, 10605, 10606, 10607, 10608, 10609, 10610, 10611, 10612, 10613, 10614, 10615, 10616, 10617, 10618, 10619, 10620, 10621, 10622, 10623, 10624, 10625, 10626, 10627, 10628, 10629, 10630, 10631, 10632, 10633, 10634, 10635, 35305, 35306, 35307, 35308, 35309, 35310, 35311, 35312, 35313, 35314, 35315, 35316, 35317, 35318, 35319, 35320, 35321, 35322, 35323, 35324, 35325, 35326, 35327, 35328, 35329, 35330, 35331, 35640, 35641, 35642, 35643, 35644, 35645, 35646, 35647, 35648, 35649, 35650, 35651, 35652, 35653, 35654, 35655, 35656, 35657, 35658, 35659, 35660, 35661, 35662, 35663, 35664, 35665, 35673, 35674, 35675, 48559, 48560, 48561, 48562, 48563, 48564, 48565, 48566, 48567, 48568, 48569, 48570, 48571, 48572, 48573, 48574, 48575, 48576, 48577, 48578, 48579, 48580, 48581, 48582, 48583, 48584, 48585, 73644, 73645, 73646, 73647, 73648, 73649, 73650, 73651, 73652, 73653, 73654, 73655, 73656, 73657, 73658, 73659, 73660, 73661, 73662, 73663, 76786, 76787, 76788, 76789, 76790, 76791, 76792, 76793, 76794, 76795]
 
 
-a = get_coordinates()
-b = a
+# con = []
+# c = 0
+# for i in range(1, len(a)):
+#     if a[i]-1 == a[i-1] and i > 1:
+#         c = c+1
+#     else:
+#         con.append(c)
 
-b = b['y'].rolling(7, min_periods = 1).mean()
+# numbers = []
+# for j in range(1, len(con)):
+#     numbers.append(mean(a[con[j-1]:con[j]]))
 
-print('\n\n\n',a)
+#print(numbers)
 
-print(b)
+
+# test = get_jenks_breaks(a, 3)
+# print(test)
+
+# a = [9406, 9407, 9408, 9409, 9410, 9411, 9412, 9413, 9414, 9415, 9416, 9417, 9418, 9419, 9420, 9421, 9422, 9423, 9424, 9425, 9426, 9427, 9428, 9429, 9430, 9431, 9432, 9433, 9434, 9435, 9436, 9437, 9438, 9439, 9440, 9441, 9442, 9443, 9444, 9445, 9446, 9447, 9448, 9449, 9450, 9451, 9452, 9453, 9454, 9455, 9456, 9457, 9458, 9459, 9460, 9461, 9462, 9463, 9464, 9465, 9466, 9467, 9468, 9469, 9470, 9471, 9472, 9473, 9474, 9475, 9476, 9477, 9478, 9479, 9480, 9481, 9482, 9483, 9484, 9485, 9486, 9487, 9488, 9489, 9490, 9491, 9492, 9493, 9494, 9495, 9496, 9497, 9498, 9499, 9500, 9501, 9502, 9503, 9504, 9505, 9506, 9507, 9508, 9509, 9510, 9511, 9512, 9513, 9514, 9515, 9516, 9517, 9518, 9519, 9520, 9521, 9522, 9523, 9524, 9525, 9526, 9527, 9528, 9529, 9530, 9531, 9532, 9533, 9534, 9535, 9536, 9537, 9538, 9539, 9540, 9541, 9542, 9543, 9544, 9545, 9546, 9547, 9548, 9549, 9550, 9551, 9552, 9553, 9554, 9555, 9556, 9557, 9558, 9559, 9560, 9561, 9562, 9563, 9564, 9565, 9566, 9567, 9568, 9569, 9570, 9571, 9572, 9573, 9574, 9575, 9576, 9577, 9578, 9579, 9580, 9581, 9582, 9583, 9584, 9585, 9586, 9587, 9588, 9589, 9590, 9591, 9592, 9593, 9594, 9595, 9596, 9597, 9598, 9599, 9600, 9601, 9602, 9603, 9604, 9605, 9606, 9607, 9608, 9609, 9610, 9611, 9612, 9613, 9614, 9615, 9616, 9617, 9618, 9619, 9620, 9621, 9622, 9623, 9624, 9625, 9626, 9627, 9628, 9629, 9630, 9631, 9632, 9633, 9634, 9635, 9636, 9637, 9638, 9639, 9640, 9641, 9642, 9643, 9644, 9645, 9646, 9647, 9648, 9649, 9650, 9651, 9652, 9653, 9654, 9655, 9656, 9657, 9658, 9659, 9660, 9661, 9662, 9663, 9664, 9665, 9666, 9667, 9668, 9669, 9670, 9671, 9672, 9673, 9674, 9675, 9676, 9677, 9678, 9679, 9680, 9681, 9682, 9683, 9684, 9685, 9686, 9687, 9688, 9689, 9690, 9691, 9692, 9693, 9694, 9695, 9696, 9697, 9698, 9699, 9700, 9701, 9702, 9703, 9704, 9705, 9706, 9707, 9708, 9709, 9710, 9711, 9712, 9713, 9714, 9715, 9716, 9717, 9718, 9719, 9720, 9721, 9722, 9723, 9724, 9725, 9726, 9727, 9728, 9729, 9730, 9731, 9732, 9733, 9734, 9735, 9736, 9737, 9738, 9739, 9740, 9741, 9742, 9743, 9744, 9745, 9746, 9747, 9748, 9749, 9750, 9751, 9752, 9753, 9754, 9755, 9756, 9757, 9758, 9759, 9760, 9761, 9762, 9763, 9764, 9765, 9766, 9767, 9768, 9769, 9770, 9771, 9772, 9773, 9774, 9775, 9776, 9777, 9778, 9779, 9780, 9781, 9782, 9783, 9784, 9785, 9786, 9787, 9788, 9789, 9790, 9791, 9792, 9793, 9794, 9795, 9796, 9797, 9798, 9799, 9800, 9801, 9802, 9803, 9804, 9805, 9806, 9807, 9808, 9809, 9810, 9811, 9812, 9813, 9814, 9815, 9816, 9817, 9818, 9819, 9820, 9821, 9822, 9823, 9824, 9825, 9826, 9827, 9828, 9829, 9830, 9831, 9832, 9833, 9834, 9835, 9836, 9837, 9838, 9839, 9840, 9841, 9842, 9843, 9844, 9845, 9846, 9847, 9848, 9849, 9850, 9851, 9852, 9853, 9854, 9855, 9856, 9857, 9858, 9859, 9860, 9861, 9862, 9863, 9864, 9865, 9866, 9867, 9868, 9869, 9870, 9871, 9872, 9873, 9874, 9875, 9876, 9877, 9878, 9879, 9880, 9881, 9882, 9883, 9884, 9885, 9886, 9887, 9888, 9889, 9890, 9891, 9892, 9893, 9894, 9895, 9896, 9897, 9898, 9899, 9900, 9901, 9902, 9903, 9904, 9905, 9906, 9907, 9908, 9909, 9910, 9911, 9912, 9913, 9914, 9915, 9916, 9917, 9918, 9919, 9920, 9921, 9922, 9923, 9924, 9925, 9926, 9927, 9928, 9929, 9930, 9931, 9932, 9933, 9934, 9935, 9936, 9937, 9938, 9939, 9940, 9941, 9942, 9943, 9944, 9945, 9946, 9947, 9948, 9949, 9950, 9951, 9952, 9953, 9954, 9955, 9956, 9957, 9958, 9959, 9960, 9961, 9962, 9963, 9964, 9965, 9966, 9967, 9968, 9969, 9970, 9971, 9972, 9973, 9974, 9975, 9976, 9977, 9978, 9979, 9980, 9981, 9982, 9983, 9984, 9985, 9986, 9987, 9988, 9989, 9990, 9991, 9992, 9993, 9994, 9995, 9996, 9997, 9998, 9999, 10000, 10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008, 10009, 10010, 10011, 10012, 10013, 10014, 10015, 10016, 10017, 10018, 10019, 10020, 10021, 10022, 10023, 10024, 10025, 10026, 10027, 10028, 10029, 10030, 10031, 10032, 10033, 10034, 10035, 10036, 10037, 10038, 10039, 10040, 10041, 10042, 10043, 10044, 10045, 10046, 10047, 10048, 10049, 10050, 10051, 10052, 10053, 10054, 10055, 10056, 10057, 10058, 10059, 10060, 10061, 10062, 10063, 10064, 10065, 10066, 10067, 10068, 10069, 10070, 10071, 10072, 10073, 10074, 10075, 10076, 10077, 10078, 10079, 10080, 10081, 10082, 10083, 10084, 10085, 10086, 10087, 10088, 10089, 10090, 10091, 10092, 10093, 10094, 10095, 10096, 10097, 10098, 10099, 10100, 10101, 10102, 10103, 10104, 10105, 10106, 10107, 10108, 10109, 10110, 10111, 10112, 10113, 10114, 10115, 10116, 10117, 10118, 10119, 10120, 10121, 10122, 10123, 10124, 10125, 10126, 10127, 10128, 10129, 10130, 10131, 10132, 10133, 10134, 10135, 10136, 10137, 10138, 10139, 10140, 10141, 10142, 10143, 10144, 10145, 10146, 10147, 10148, 10149, 10150, 10151, 10152, 10153, 10154, 10155, 10156, 10157, 10158, 10159, 10160, 10161, 10162, 10163, 10164, 10165, 10166, 10167, 10168, 10169, 10170, 10171, 10172, 10173, 10174, 10175, 10176, 10177, 10178, 10179, 10180, 10181, 10182, 10183, 10184, 10185, 10186, 10187, 10188, 10189, 10190, 10191, 10192, 10193, 10194, 10195, 10196, 10197, 10198, 10199, 10200, 10201, 10202, 10203, 10204, 10205, 10206, 10207, 10208, 10209, 10210, 10211, 10212, 10213, 10214, 10215, 10216, 10217, 10218, 10219, 10220, 10221, 10222, 10223, 10224, 10225, 10226, 10227, 10228, 10229, 10230, 10231, 10232, 10233, 10234, 10235, 10236, 10237, 10238, 10239, 10240, 10241, 10242, 10243, 10244, 10245, 10246, 10247, 10248, 10249, 10250, 10251, 10252, 10253, 10254, 10255, 10256, 10257, 10258, 10259, 10260, 10261, 10262, 10263, 10264, 10265, 10266, 10267, 10268, 10269, 10270, 10271, 10272, 10273, 10274, 10275, 10276, 10277, 10278, 10279, 10280, 10281, 10282, 10283, 10284, 10285, 10286, 10287, 10288, 10289, 10290, 10291, 10292, 10293, 10294, 10295, 10296, 10297, 10298, 10299, 10300, 10301, 10302, 10303, 10304, 10305, 10306, 10307, 10308, 10309, 10310, 10311, 10312, 10313, 10314, 10315, 10316, 10317, 10318, 10319, 10320, 10321, 10322, 10323, 10324, 10325, 10326, 10327, 10328, 10329, 10330, 10331, 10332, 10333, 10334, 10335, 10336, 10337, 10338, 10339, 10340, 10341, 10342, 10343, 10344, 10345, 10346, 10347, 10348, 10349, 10350, 10351, 10352, 10353, 10354, 10355, 10356, 10357, 10358, 10359, 10360, 10361, 10362, 10363, 10364, 10365, 10366, 10367, 10368, 10369, 10370, 10371, 10372, 10373, 10374, 10375, 10376, 10377, 10378, 10379, 10380, 10381, 10382, 10383, 10384, 10385, 10386, 10387, 10388, 10389, 10390, 10391, 10392, 10393, 10394, 10395, 10396, 10397, 10398, 10399, 10400, 10401, 10402, 10403, 10404, 10405, 10406, 10407, 10408, 10409, 10410, 10411, 10412, 10413, 10414, 10415, 10416, 10417, 10418, 10419, 10420, 10421, 10422, 10423, 10424, 10425, 10426, 10427, 10428, 10429, 10430, 10431, 10432, 10433, 10434, 10435, 10436, 10437, 10438, 10439, 10440, 10441, 10442, 10443, 10444, 10445, 10446, 10447, 10448, 10449, 10450, 10451, 10452, 10453, 10454, 10455, 10456, 10457, 10458, 10459, 10460, 10461, 10462, 10463, 10464, 10465, 10466, 10467, 10468, 10469, 10470, 10471, 10472, 10473, 10474, 10475, 10476, 10477, 10478, 10479, 10480, 10481, 10482, 10483, 10484, 10485, 10486, 10487, 10488, 10489, 10490, 10491, 10492, 10493, 10494, 10495, 10496, 10497, 10498, 10499, 10500, 10501, 10502, 10503, 10504, 10505, 10506, 10507, 10508, 10509, 10510, 10511, 10512, 10513, 10514, 10515, 10516, 10517, 10518, 10519, 10520, 10521, 10522, 10523, 10524, 10525, 10526, 10527, 10528, 10529, 10530, 10531, 10532, 10533, 10534, 10535, 10536, 10537, 10538, 10539, 10540, 10541, 10542, 10543, 10544, 10545, 10546, 10547, 10548, 10549, 10550, 10551, 10552, 10553, 10554, 10555, 10556, 10557, 10558, 10559, 10560, 10561, 10562, 10563, 10564, 10565, 10566, 10567, 10568, 10569, 10570, 10571, 10572, 10573, 10574, 10575, 10576, 10577, 10578, 10579, 10580, 10581, 10582, 10583, 10584, 10585, 10586, 10587, 10588, 10589, 10590, 10591, 10592, 10593, 10594, 10595, 10596, 10597, 10598, 10599, 10600, 10601, 10602, 10603, 10604, 10605, 10606, 10607, 10608, 10609, 10610, 10611, 10612, 10613, 10614, 10615, 10616, 10617, 10618, 10619, 10620, 10621, 10622, 10623, 10624, 10625, 10626, 10627, 10628, 10629, 10630, 10631, 10632, 10633, 10634, 10635, 35305, 35306, 35307, 35308, 35309, 35310, 35311, 35312, 35313, 35314, 35315, 35316, 35317, 35318, 35319, 35320, 35321, 35322, 35323, 35324, 35325, 35326, 35327, 35328, 35329, 35330, 35331, 35640, 35641, 35642, 35643, 35644, 35645, 35646, 35647, 35648, 35649, 35650, 35651, 35652, 35653, 35654, 35655, 35656, 35657, 35658, 35659, 35660, 35661, 35662, 35663, 35664, 35665, 35673, 35674, 35675, 48559, 48560, 48561, 48562, 48563, 48564, 48565, 48566, 48567, 48568, 48569, 48570, 48571, 48572, 48573, 48574, 48575, 48576, 48577, 48578, 48579, 48580, 48581, 48582, 48583, 48584, 48585, 73644, 73645, 73646, 73647, 73648, 73649, 73650, 73651, 73652, 73653, 73654, 73655, 73656, 73657, 73658, 73659, 73660, 73661, 73662, 73663, 76786, 76787, 76788, 76789, 76790, 76791, 76792, 76793, 76794, 76795]
+
+# from sklearn.cluster import KMeans
+
+# num_clusters = np.arange(1, 10)
+
+# km = KMeans(n_clusters=5).fit(np.array(a).reshape(-1,1))
+
+# clusters = np.transpose(km.cluster_centers_)
+# print(clusters)
+
+# leak_data = [{'leak':'p232', 'start': 9124,   'stop': 11634},
+#             {'leak': 'p461', 'start': 13807,  'stop': 26530}, 
+#             {'leak': 'p538', 'start': 39561,  'stop': 43851}, 
+#             {'leak': 'p628', 'start': 36520,  'stop': 42883}, 
+#             {'leak': 'p673', 'start': 18335,  'stop': 23455}, 
+#             {'leak': 'p866', 'start': 43600,  'stop': 46694}]
+
+# leak_df = pd.DataFrame(data = leak_data)
+
+# alternative_file_path = f'custom_data/halfabruptleaksv2.csv'
+
+# noseasonality_data = pd.read_csv('custom_data/halfabruptleakswithseasonalityremoved.csv')
+
+# print(noseasonality_data)
+
+# noseasonality_data['n458'].plot()
+# #plt.show()
+
+# new_df = noseasonality_data['index']
+# print(new_df)
+
+#hh = f' b er dette: {b} og a er dette: {([(round(bb,2)) for bb in bbb])}'
+
+#print(type(hh))
+#print(hh)
+#print(f' b er dette: {b} og a er dette: {([(round(bb,2)) for bb in bbb])}')
+# print(leak_df)
+# b = 0 
+# d = 0
+# for i in range(len(clusters)):
+#     for ind, row in leak_df.iterrows():
+
+#         if (row['start'] < clusters[0][i]) and (clusters[0][i] < row['stop']):
+
+#             b = b + 1
+#         else:
+#             d = d + 1 
+
+# print(b)
+# print(d)
+# results_holder = pd.DataFrame(index = [':)'],  columns = ['n', 'Accuracy', 'Precision', 'Recall', 'F1_score','True positive', 'False positive','Total leaks'], data = 0)
+
+# containerv2 = [72714, 17769, 38155,  9249,  52550, 36121]
+# d = 0
+
+# fp = False
+# tp = False
+# n  = len(containerv2)
+
+# while len(containerv2) > 0:
+#     tp = False
+#     for ind, row in leak_df.iterrows(): 
+#         if (row['start'] < containerv2[0] and containerv2[0] < row['stop']):
+#             tp = True
+#             break
+
+#     if len(containerv2) > 0:
+#         containerv2.remove(containerv2[0])
+
+#     if tp == True:
+#         current_value = results_holder['True positive'].iloc[-1]
+#         results_holder.loc[results_holder.index[-1],'True positive'] = current_value + 1
+#     else: 
+#         current_value = results_holder['False positive'].iloc[-1]
+#         results_holder.loc[results_holder.index[-1],'False positive'] = current_value + 1
+
+    # if (row['start'] < containerv2[i] and containerv2[i] < row['stop']):
+    #     current_value = results_holder['True positive'].iloc[-1]
+    #     results_holder.loc[results_holder.index[-1],'True positive'] = current_value + 1
+    # else:
+    #     current_value = results_holder['False positive'].iloc[-1]
+    #     results_holder.loc[results_holder.index[-1],'False positive'] = current_value + 1
+
+# print(results_holder)
+
+
+# lag = 288 * 7
+# threshold = 3 
+# influence = 0.9
+
+# #res = pd.read_csv('forthresholdalgofremogtilbake.csv')
+
+
+# res = np.genfromtxt('forthresholdalgofremogtilbake.csv')
+# rev_res = np.flip(res)
+# #res = np.array([res[0][:]])
+
+
+# res_ta = thresholding_algo(res, lag = lag, threshold = threshold, influence = influence)
+# rev_res_ta = thresholding_algo(rev_res, lag = lag, threshold = threshold, influence = influence)
+
+# res_signals =res_ta['signals']
+# rev_res_signals = rev_res_ta['signals']
+
+# res_ones = np.where(res_signals == 1)
+# rev_res_ones = np.where(rev_res_signals == 1)
+
+# rev_res_ones = [abs(rr - len(rev_res_ones)) for rr in rev_res_ones]
+
+# res_ones = np.array([res_ones])
+# rev_res_ones = np.array([rev_res_ones])
+
+# combined = np.append(res_ones, rev_res_ones)
+
+# print('\n\n')
+# print(combined)
+
+# km = KMeans(n_clusters=6).fit(combined.reshape(-1,1))
+
+# clusters = np.transpose(km.cluster_centers_)
+
+# print(clusters[0]) #running this i get 95.7k as  a cluster, no number is that big anywhere? does kmeans do what i think it does? how does that happen?
+
+# a = pd.read_csv('holder_res.csv')
+# print(a)
+
+# b  = np.zeros(shape= (288*28+745, 1))
+
+# c = np.append(b, a)
+# print(np.shape(c))
+
+# plt.plot(c)
+# plt.show()
+
+# time_2018 = pd.date_range(start = '2018-01-01 00:00:00', end = '2018-12-31 23:55:00', freq = '5min')
+# print(time_2018)
+# print(len(time_2018))
+
+# res_df = pd.DataFrame(index = time_2018, data = c)
+# print(res_df)
+
+# # res_df = res_df.between_time(start_time = '00:00:00', end_time = '06:00:00')
+# # res_df = res_df.resample('15T').mean()
+
+# plt.plot(res_df)
+# plt.show()
+
+leak_data = [{'leak':'p232', 'start': 9124,   'stop': 11634},
+            {'leak': 'p461', 'start': 13807,  'stop': 26530}, 
+            {'leak': 'p538', 'start': 39561,  'stop': 43851}, 
+            {'leak': 'p628', 'start': 36520,  'stop': 42883}, 
+            {'leak': 'p673', 'start': 18335,  'stop': 23455}, 
+            {'leak': 'p866', 'start': 43600,  'stop': 46694},
+            {'leak': 'p158', 'start': 80097,  'stop': 85125},
+            {'leak': 'p183', 'start': 62817,  'stop': 70192}, 
+            {'leak': 'p369', 'start': 85851,  'stop': 89815}, 
+            {'leak':  'p31', 'start': 57095,  'stop': 64437}]  
+
+leak_df = pd.DataFrame(data = leak_data)
+
+time_2018 = pd.date_range(start = '2018-01-01 00:00:00', end = '2018-12-31 23:55:00', freq = '5min')
+time_df = pd.DataFrame(columns = ['Timesteps'] ,data = time_2018)
+
+# print(time_df.iloc[leak_df['start'][5]])
+
+# time_2018 = pd.date_range(start = '2018-01-01 00:00:00', end = '2018-12-31 23:55:00', freq = '5min')
+# time_2018 = {'Timesteps': time_2018}
+# time_df = pd.DataFrame(data = time_2018)
+
+
+res = pd.read_csv('holder_res.csv')
+ones = np.ones([len(res), 1])    
+
+# res = np.array(res)
+
+# print(res.max())
+
+# when_max_res = np.argmax(res)
+# print(when_max_res)
+
+# ones = np.ones([len(res), 1])
+
+# threshold = ones*res.max()*1.2
+# leak_counter = 0
+
+# res = np.append(res, 55555)
+
+# print(res[-1])
+# print(threshold.max())
+
+# for i in range(len(res)):
+#     if res[i]>=threshold.max():
+#         leak_location_int = i
+#         leak_location = time_df.loc[i]
+#         print(f'There is a suspected leak at: {leak_location}')
+#         leak_counter += 1
+
+# vald_time = '2018-02-02 04:05:00'
+
+# a = time_df.loc[time_df['Timesteps'] == vald_time]
+# print((time_df['Timesteps'][:5]))
+
+# res_df = pd.DataFrame(data = res)
+
+# res_df = res_df.rename(columns = {"1.299504637718200684e+00":"Results"})
+# #print(res_df)
+
+# res_df = res_df.rolling(36, min_periods= 1).mean()
+# #print(res_df)
+
+# res_np = res_df.to_numpy()
+# print(res_np)
+# print(type(res_np))
+# print(np.shape(res_np))
+
+# a = res_np.reshape(len(res_np))
+
+# print(np.shape(a))
+# print(a)
+# res = res.to_numpy()
+# print(type(res))
+# res = res.reshape(len(res)) #1.372 siste element
+# print(res)
+# print(res[-14:])
+
+# a = pd.to_datetime('2018-01-01 00:00:00')
+# b = pd.to_datetime('2019-01-01 00:00:00')
+
+# c = b-a
+# print(2*c)
+
+#
+        # for i in range(vald_time_int+288, n-288, step_size):
+        #     print(i)
+        #     if res_df.iloc[i][col] > res_df.iloc[i-step_size][col]*15:
+        #         c = 0
+
+        #         for twodays in range (288*2): #compare following day, to ensure not a fluke
+        #             if res_df.iloc[i][col] > res_df.iloc[i-twodays][col]*1.5:
+
+        #             #if res_df.iloc[i+twodays][col] > res_df.iloc[i-abs(288-twodays)][col]*1.1:
+        #                 print(c, i)
+        #                 c = c + 1
+        #                 if c >= 72:
+        #                     leak_found = True
+        #                     leak_int = i
+        #                     leak_time = res_df.index[leak_int] #ideelt skal skje omtrent: 26.10.2018  02:05:00
+        #                     break
+
+        #     if leak_found:
+        #         break
+
+# print('\n\n')
+# a =  str(time_df.iloc[45454]-time_df.iloc[45533])
+# print(a)
+
+# empty_df = pd.DataFrame(index = [':)'], columns = ['col1'])
+
+# empty_df['col1'] = a
+
+# plt.plot(hh)
+# plt.show()
+
+
+
+#a = a.between_time('01:00:00', '05:00:00')
+#a = a.rolling(18, min_periods=1).max() #funket greit med 288*2
+
+#print(a.iloc[75160])
+# h = pd.read_csv('res_epochs1000_bs500_lr0.001_dataset_number0.csv')
+# print(h)
+
+#prøve: 
+# 1. sette sammen med tid
+# 2. sjekke endring i MNF
+# 3. rolling osv
+# 3.5 kanskej nok?
+# 4. sjekke om threshold algo_kan funke
+""""
+prøver dette: henter ut når første max for alle
+utlukker hvis første_max indx er mindre enn 120% av første_max_indx-1
+finner ut hvilket nummerområde som har flest max'er, i.e hvis to tall
+kanskje også hvis demand-endring på samme tidspunkt ----> lekkasje
+
+tror det er sjokkbølgen en finner lettest etter rask burst-lekkasje, må kanskje ha 3-threshold funksjoner eller lignende, for å avgjøre typene
+lekkasje. (fant ingen sjokkbølge i p369)
+i.e. hvis ikke finner rapid burst i per_sensor_filled -> videre til slow increase -> videre til neverending -> ingen lekkasje
+"""
+# def neighbour_values_is_close(b, idx_first_max_number):
+    
+# indx_first_max = []
+# for col in a.columns:
+#     b = a[col].to_numpy()
+#     b = b**0.5*2 #undoes the MSE
+#     plt.plot(b, label = col)
+
+#     # array_first_max = np.where([b[i] == b.max() for i in range(len(b))])
+#     # idx_first_max_number = array_first_max[0][0]
+#     # if b[array_first_max[0][0]] > 2.5 * b[array_first_max[0][0]-1]:
+
+#     #     indx_first_max.append(idx_first_max_number)
+        
+#     # print(indx_first_max)
+
+#     plt.legend()
+#     plt.show()
+a = pd.read_csv('X_per_sensor_epochs500_bs500_lr0.001_datasetp369_correct_version.csv')
+print(a)
+
+a = a.set_index('Unnamed: 0')
+
+a = a[1:]
+
+a.index = pd.to_datetime(a.index)
+
+
+vald_time = pd.to_datetime('2018-01-29 00:00:00')
+vald_time_int = time_df.loc[time_df['Timesteps'] == vald_time]
+vald_time_int = int(vald_time_int.index.values)
+
+# zero_array = np.zeros(shape = (vald_time_int, 1))
+# res = np.append(zero_array, res)
+
+# #dataframe of the results to be plotted in the leak_detection plot.
+# from rolling_AE_functions import import_data
+# p369 = import_data('p369')
+
+for col in a.columns:
+    leak_found = False
+    leak_int = 0
+    leak_time = pd.to_datetime('2001-01-01 00:00:00')
+
+    b = a[col].to_numpy()
+    zero_array = np.zeros(shape = (vald_time_int, 1))
+    b = np.append(zero_array, b)
+
+    res_df = pd.DataFrame(index = time_df['Timesteps'][:len(b)], columns=[col], data = b)
+    res_df = res_df**0.5*2 #undo the MSE
+
+    #res_df = p369 + res_df
+    #res_df = res_df[0:92500]
+    #res_df = res_df.between_time('02:00:00', '04:00:00')
+    #step_size = 18 #
+    half_a_day = 5*12*12
+    #res_df = res_df.rolling(step_size).max #tror max er """bedre""" enn average,  er trolig eneste jeg kan konkludere med her i dag fåvæ
+
+    #p369 = p369[:92500]
+
+    #res_df = res_df.resample('15min').max()
+    #p369 = p369.resample('15min').max()
+
+    #if col == 'n54': #n54 for p369 i think, n613 closest for p654
+
+    n, m = np.shape(res_df)
+
+    #for i in range(vald_time_int+half_a_day, len(res_df)-1): #eeded for plotting gradually
+
+    for j, ind in enumerate(res_df.index[vald_time_int:]): #trekker fra 6 timer og 5 min, 
+        number = res_df.loc[ind]
+        max_in_prev_month = res_df.iloc[vald_time_int+j-288*7:vald_time_int+j].max()
+        
+        if float(number) >= 1.4*float(max_in_prev_month) and float(max_in_prev_month) != 0 and j > 10:
+            initial_qoutient = number / max_in_prev_month
+
+            print(f'initial qoutient: {initial_qoutient}')
+            print(f'future_ind: {ind}')
+
+            c = 0
+            for k in range (6): #6 hours ahead and equal hours back, and same ts in week for 2 weeks
+                next_check_number_ts = ind + pd.DateOffset(hours = k)
+                back_check_num_ts = ind - pd.DateOffset(hours = abs(24-k))
+
+                next_check_number = res_df.loc[next_check_number_ts]
+                back_check_num = res_df.loc[back_check_num_ts]
+
+                if float(next_check_number) > float(back_check_num)*1.2 and [float(next_check_number) > 1.2*float(res_df.loc[ind-pd.DateOffset(days = 7*i)]) for i in range(3)]:
+                    c = c + 1
+                    if c > 5:
+                        print('Leak found :-)')
+                        print(ind)
+                        plt.plot(ind, 0, marker = 'x', color = 'red', markersize=14)
+
+
+    plt.plot(res_df[0:vald_time_int+j])
+        # plt.plot(res_df)
+    plt.show()
+
+            # plt.draw()
+            # plt.pause(0.0001)
+            # plt.clf()
+
+        # for ind in res_df_rolling.index[-21*288:]: #last two weeks
+        #     number = res_df_rolling.loc[ind]
+
+        #     if number >= 0.85 * res_df_rolling.iloc[-21*288:].max(): #noen vil alltid være blant disse
+        #         candidates.append(number)
+        #         candidates_ind.append(ind)
+
+        #     for i, c in enumerate(candidates):
+        #         ts = candidates_ind[i]
+
+
+
+            # plt.plot(min_line, color = 'green')
+            # plt.plot(max_line, color = 'purple')
+            # plt.plot(avg_line,  color = 'red')
+            # plt.show()
+            # plt.draw()
+            # plt.pause(0.0001)
+            # plt.clf()
+    #plt.show()
+
+
+        # min_holder = []
+        # max_holder = []
+        # #for i in range(vald_time_int+step_size, len(res_df)-1, step_size):
+        #     fig = plt.figure(1, figsize = (14,6))
+
+        #     ones = np.ones(shape = [len(res_df[0:i+step_size])])
+        #     ones_short = np.ones(shape = step_size)
+
+        #     #print(np.min(res_df[i:i+1]))
+
+        #     min_line = res_df[i:i+step_size].min()
+        #     max_line = res_df[i:i+step_size].max()
+        #     avg_line = res_df[i:i+step_size].mean()
+
+        #     min_momentarily = ones_short * min_line.values
+        #     max_momentarily = ones_short * max_line.values
+
+        #     min_line = min_line.values * ones
+        #     max_line = max_line.values * ones
+        #     avg_line = avg_line.values * ones
+
+        #     min_line = np.append(zero_array, min_line)
+        #     min_holder = np.append(min_holder, min_momentarily)
+        #     max_line = np.append(zero_array, max_line)
+        #     max_holder = np.append(max_holder, max_momentarily)
+        #     avg_line = np.append(zero_array, avg_line)
+
+        #     min_line = pd.DataFrame(index = time_df['Timesteps'][0:len(min_line)], columns = ['min_line'], data = min_line)
+        #     max_line = pd.DataFrame(index = time_df['Timesteps'][0:len(max_line)], columns = ['max_line'], data = max_line)
+        #     avg_line = pd.DataFrame(index = time_df['Timesteps'][0:len(avg_line)], columns = ['avg_line'], data = avg_line)
+
+
+
+        #  if col == 'n54': #n54 for p369 i think, n613 closest for p654
+    
+        # n, m = np.shape(res_df)
+
+        # min_holder = []
+        # max_holder = []
+        # for i in range(vald_time_int+halfdelay, len(res_df)-1, step_size):
+        
+
+
+        #     res_df_rolling = res_df[(vald_time_int+144):i][col].rolling(step_size*step_size, min_periods=1).mean()
+
+        #     for ind in res_df_rolling.index[-21*288:-73]: #trekker fra 6 timer og 5 min, ellers siste 3 ukene
+        #         future_ind = ind + pd.DateOffset(minutes = 5)
+        #         number = res_df_rolling.loc[future_ind]
+
+        #         if number >= 2.5 * res_df_rolling[ind].max():
+        #             initial_qoutient = number / res_df_rolling[ind].max()
+
+        #             print(f'initial qoutient: {initial_qoutient}')
+        #             print(f'future_ind: {future_ind}')
+
+        #             #checks if a fluke or not, 3 hours ahead, compared with 21 hours behind, should be same hour of day different days
+        #             more_future_3h = future_ind + pd.DateOffset(hours = 3)
+        #             ind_3h = future_ind - pd.DateOffset(hours = 21)
+
+        #             number_3h = res_df_rolling.loc[more_future_3h]
+        #             num_3h = res_df_rolling.loc[ind_3h]
+
+        #             if number_3h >= 2 * num_3h: #same as above
+        #                 threeh_qoutient = number_3h /num_3h
+        #                 print(f'three hour qoutient: {threeh_qoutient}')
+
+        #                 more_future_6h = future_ind + pd.DateOffset(hours = 6)
+        #                 ind_6h = future_ind - pd.DateOffset(hours = 18)
+
+        #                 number_6h = res_df_rolling.loc[more_future_6h]
+        #                 num_6h = res_df_rolling.loc[ind_6h]
+
+        #                 if number_6h >= 2 * num_6h:
+        #                     sixh_qoutient = number_6h / num_6h
+
+        #                     print(f'six hour qoutient: {sixh_qoutient}')
+        #                     print('Leak is found :-)')
+        #                     print(future_ind)
+
+        #                     plt.plot(future_ind, 0, marker = 'x', color = 'red', markersize=14)
+
+
+        #     plt.plot(res_df[0:i+1])
+        #     plt.plot(res_df_rolling, color = 'black')
+        #     #plt.show()
+
+        #     plt.draw()
+        #     plt.pause(0.0001)
+        #     plt.clf()
+
+        # # for ind in res_df_rolling.index[-21*288:]: #last two weeks
+        # #     number = res_df_rolling.loc[ind]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# #dette har jeg ikke troen på fåvæ
+# min_qoutients = np.array([])
+# max_qoutients = np.array([])
+# for i in range (step_size, len(min_holder), step_size):
+#     min_qoutients = np.append(min_qoutients, min_holder[i]/min_holder[i-step_size])
+#     max_qoutients = np.append(max_qoutients, max_holder[i]/max_holder[i-step_size])
+
+# #plt.plot(min_qoutients[2000:len(min_qoutients)])
+# plt.plot(max_qoutients[2000:len(max_qoutients)])
+# plt.show()
+
+
+
+
+            # plt.plot(res_df[col][0:i+1])
+
+            # plt.plot(min_line, color = 'green')
+            # plt.plot(max_line, color = 'purple')
+            # plt.plot(avg_line,  color = 'red')
+
+            # plt.draw()
+            # plt.pause(0.0001)
+            # plt.clf()
+
+
+#             #start here next time :-)
+
+#         # fig = plt.figure(1, figsize = (14,6))
+
+#         # print(leak_found)
+#         # print(leak_int)
+#         # print(leak_time)
+#         # #p369[col].plot(color = 'red')
+#         # plt.plot(res_df[col], label  = col) #https://prnt.sc/tQLjgrPWNt4f
+#         # plt.plot(time_df.iloc[leak_int + vald_time_int], 0, marker = 'x', color = 'red', label = 'Detected leak', markersize=14)
+#         # plt.title('p654')
+#         # plt.legend()
+#         # plt.show()
+    
+# j = vald_time_int+1+step_size*2
+# #for i in range(vald_time_int+1, len(res_df)-1, step_size):
+
+#     # min_line['quotient'] = min_line['min_line'][j]/min_line['min_line'][i]
+
+#     # if i == 82441:
+#     #     print(f'this is i: {i}') #når 82441
+#     #     print(f'this is j: {j}') #burde vært 82459
+
+#     # j = j + step_size
+
+# plt.plot(min_line['min_line'])
+# plt.show()
