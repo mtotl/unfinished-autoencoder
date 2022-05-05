@@ -32,16 +32,14 @@ import math
 from statsmodels.tsa.seasonal import STL
 
 from autoencoders_and_more import AutoEncoder_1, AutoEncoder_2, AutoEncoder_3, AutoEncoder_4, AutoEncoder_5, AutoEncoder_6
-from autoencoders_and_more import thresholding_algo, ordered_cluster, get_timestep
+from autoencoders_and_more import thresholding_algo, ordered_cluster
 
 
 from autoencoder_test_test import score, score_v2
 
 from os import listdir
 
-from rolling_AE_functions import create_folders, import_data, plot_reconstruction
-
-
+from rolling_AE_functions import create_folders, import_data, plot_reconstruction, leak_location_plot, threshold_function_v2, threshold_function_v3
 import pylab
 
 import gc
@@ -74,7 +72,7 @@ def train(epochs, model, model_loss):
         model_loss.epoch.append(c + epoch)
         model_loss.loss.append(l.item())
         model_loss.val_loss.append(np.mean(val_scores))
-        if epoch%100==0 or epoch == epochs-1:
+        if epoch%500==0 or epoch == epochs:
             print(f'Epoch: {epoch}   Loss: {l.item():.5f}    Val_Loss: {np.mean(val_scores):.5f}') 
 
 
@@ -90,17 +88,14 @@ def score_v2(xt, df):
     Output from this function is a dataframe in which each cell is the MSE between
     input cell and model's predicition for the given input cell
     so 105kx36 or so, if whole year is run through, but typically in 2 week chunks, 4033x36
-
-    
     """
     y_pred = model(V(xt))     
     x1 = V(xt)    
 
     n, m = np.shape(y_pred)
     for i in range (n):
-        for j in range (m):
-            df.iloc[i][j] = (x1[i][j]-y_pred[i][j])**2/2 
-
+        df.iloc[i] = (x1[i].detach().numpy()-y_pred[i].detach().numpy())**2/2
+        
     return df
 
 
@@ -111,33 +106,71 @@ if __name__ == '__main__':
     time_2018 = {'Timesteps': time_2018}
     time_df = pd.DataFrame(data = time_2018)
 
-    #used to determine when leaks first occur, the end is currently not used
-    leak_data = [{'leak':'p232', 'start': 9124,   'stop': 11634},
-                {'leak': 'p461', 'start': 13807,  'stop': 26530}, 
-                {'leak': 'p538', 'start': 39561,  'stop': 43851}, 
-                {'leak': 'p628', 'start': 36520,  'stop': 42883}, 
-                {'leak': 'p673', 'start': 18335,  'stop': 23455}, 
-                {'leak': 'p866', 'start': 43600,  'stop': 46694},
-                {'leak': 'p158', 'start': 80097,  'stop': 85125},
-                {'leak': 'p183', 'start': 62817,  'stop': 70192}, 
-                {'leak': 'p369', 'start': 85851,  'stop': 89815}, 
-                {'leak':  'p31', 'start': 57095,  'stop': 64437},
-                {'leak': 'p654', 'start': 73715,  'stop': -9999}]  #-9999 since never ends, start at 5 m3/h
+
+    leak_flows = pd.read_csv('2018_leakages_dot.csv', delimiter = ';')
+
+    #nå regnes start fra 0
+    leak_data = [{'leak':'p232', 'start': 8687,   'stop': 11634, 'h_number': 1,  'h_stop': 3}, 
+                {'leak': 'p461', 'start': 6625,   'stop': 26530, 'h_number': 1,  'h_stop': 4},
+                {'leak': 'p538', 'start': 39561,  'stop': 43851, 'h_number': 7,  'h_stop': 11},
+                {'leak': 'p628', 'start': 35076,  'stop': 42883, 'h_number': 6,  'h_stop': 10},
+                {'leak': 'p673', 'start': 18335,  'stop': 23455, 'h_number': 2,  'h_stop': 6},
+                {'leak': 'p866', 'start': 43600,  'stop': 46694, 'h_number': 6,  'h_stop': 10},
+                {'leak': 'p158', 'start': 80097,  'stop': 85125, 'h_number': 17, 'h_stop': 20},
+                {'leak': 'p183', 'start': 62817,  'stop': 70192, 'h_number': 12, 'h_stop': 16},
+                {'leak': 'p369', 'start': 85851,  'stop': 89815, 'h_number': 18, 'h_stop': 21},
+                {'leak':  'p31', 'start': 51573,  'stop': 64437, 'h_number': 9,  'h_stop': 20}, # skjer noe rart med p31 <-- er i sone A
+                {'leak': 'p654', 'start': 73715,  'stop': -9999, 'h_number': 10, 'h_stop': 21},  #-9999 since never ends, start at 5 m3/h
+                {'leak': 'p257', 'start': 2312,   'stop': -9999, 'h_number': 1,  'h_stop': 21},  #starter omtrentlig med en gang, 1 er laveste h tallet som kan kjøres
+                {'leak': 'p810', 'start': 61254,  'stop': -9999, 'h_number': 13, 'h_stop': 21},   #-9999 since never ends, start at 5 m3/h
+                {'leak': 'p427', 'start': 13301,  'stop': -9999, 'h_number': 1,  'h_stop': 21},]  #-9999 since never ends, start at 5 m3/h
+
+    #leak_data = [{'leak':'p232', 'start': 9124,   'stop': 11634, 'h_number': 1,  'h_stop': 24}, 
+                # {'leak': 'p461', 'start': 13807,  'stop': 26530, 'h_number': 1,  'h_stop': 24},
+                # {'leak': 'p538', 'start': 39561,  'stop': 43851, 'h_number': 1,  'h_stop': 24},
+                # {'leak': 'p628', 'start': 36520,  'stop': 42883, 'h_number': 1,  'h_stop': 24},
+                # {'leak': 'p673', 'start': 18335,  'stop': 23455, 'h_number': 1,  'h_stop': 24},
+                # {'leak': 'p866', 'start': 43600,  'stop': 46694, 'h_number': 1,  'h_stop': 24},
+                # {'leak': 'p158', 'start': 80097,  'stop': 85125, 'h_number': 1, 'h_stop': 24},
+                # {'leak': 'p183', 'start': 62817,  'stop': 70192, 'h_number': 1, 'h_stop': 24},
+                # {'leak': 'p369', 'start': 85851,  'stop': 89815, 'h_number': 1, 'h_stop': 24},
+                # {'leak':  'p31', 'start': 57095,  'stop': 64437, 'h_number': 1,  'h_stop': 24}, # skjer noe rart med p31
+                # {'leak': 'p654', 'start': 73715,  'stop': -9999, 'h_number': 1, 'h_stop': 24},  #-9999 since never ends, start at 5 m3/h
+                # {'leak': 'p257', 'start': 288*7,  'stop': -9999, 'h_number': 1, 'h_stop': 24},  #starter omtrentlig med en gang, 1 er laveste h tallet som kan kjøres
+                # {'leak': 'p810', 'start': 61254,  'stop': -9999, 'h_number': 1, 'h_stop': 24},   #-9999 since never ends, start at 5 m3/h
+                # {'leak': 'p427', 'start': 13301,  'stop': -9999, 'h_number': 1,  'h_stop': 24},] 
+
     leak_df = pd.DataFrame(data = leak_data)
 
-    #a few datasets to test on initially
-    #p369: quick burst, fant med rolling_AE greit
+    burst_datasets = ['p158', 'p183', 'p369', 'p538', 'p673', 'p866'] 
+    slow_increase_datasets = ['p232','p461','p628','p31']
+    neverending_datasets = ['p257', 'p427', 'p654', 'p810']
+    
+    #a few datasets to test on initially https://prnt.sc/ry3QhC8_YrRp <--25_04 https://prnt.sc/73z9Rp2wcoOV more 25_04
+    #p369: quick burst, fant med rolling_AE greit, sliter finne med 25_04 konfigurasjon, 
     #p183: fant ikke med rolling_AE greit
     #p628: slow increase
+    #p538 gikk greit 
+    #p158<-------- tror regn flaks at finner noe lekkasje, når graver i det, så ser en ikke tydelig lekkasje
     #p654: neverending
     #p866, opprinnelige datasettet, funnet enkelt med rolling_ae og første jeg lagde her
-    #some_abrupt_burst_datasets = ['p183', 'p866','p369','p628','p654']
-    some_abrupt_burst_datasets = ['p628','p183','p866','p369']
+    #p232, skjer så tidlig i året, må trolig fikse på 2-uker grensene eller lignende
+        #evt, lage spesial trenings-fase for det datasettet
+    
+    
+        #husk kjøre disse, var ikke ok sist
+    #some_abrupt_burst_datasets = ['p31']
 
+    #some_abrupt_burst_datasets = ['p257', 'p427', 'p654', 'p810'] # kjør disse etterpå
+
+    #for p628,  gjør en vurdering om hvilke sensorer som detekterer først, tror ikke nærmeste slår helt ut alene
+    #some_abrupt_burst_datasets = ['p538','p158','p461','p31','p183','p866','p628','p369','p232']
+    some_abrupt_burst_datasets = ['p232']
     #dataframe to keep the total results, the preliminary results are concatenated to each iteration
-    super_results = pd.DataFrame(index = [':)'], columns = ['Model iteration','Dataset','Time detected leak', 'Time true leak', 'Difference','Accumulated difference'], data = 0)
+    super_results = pd.DataFrame(index = [':)'], columns = ['Model iteration','Dataset','Time detected leak', 'Time true leak', 'Difference','Accum. difference'], data = 0)
 
-    for kk in range(100):
+    for kk in range(20000):
+
 
         startTime = datetime.now()
         """
@@ -146,7 +179,6 @@ if __name__ == '__main__':
             architectures, but initially only AE_6
             then, for a given model configuration, it is run on each of the datasets found in some_abrupt_burst_datasets
             in the while loop, it is run until a leak is found
-        
         """
             #creates folders for saving various information
         folders = create_folders()
@@ -187,7 +219,17 @@ if __name__ == '__main__':
             #starting point of the accumulated timestep difference, ideally a configuration has a low accumulation of timestep difference
             #between the detected leak location and the true leak location, although this criteria has its drawbacks, 
             #it needs more refinement later
-        acc_diff = 0
+
+        accumulated_diff = 0
+        possible_multipliers = np.arange(1, 6, 0.25)
+        possible_multipliers_v2 = np.arange(2, 6, 0.25)
+        
+        #comparison_number_multiplier = possible_multipliers[randrange(len(possible_multipliers))]
+        #comparison_number_multiplier = possible_multipliers[kk]
+        comparison_number_multiplier = 1
+        comparison_number_multiplier_v2 = possible_multipliers_v2[kk]
+        
+        #comparison_number_multiplier_v2 = 1.15
 
         for dataset_number, dataset in enumerate(some_abrupt_burst_datasets):
             res = np.array([]) 
@@ -203,27 +245,32 @@ if __name__ == '__main__':
 
                 #timestep frequency in which the training, validation changed, currently 2 weeks
             every_second_week = pd.bdate_range('2018-01-01','2018-12-31 23:55:00', freq = freq_t_v)
-            print(every_second_week[0])
 
             #Empty dataframe in which to concatenate output from score-functions later on
             Y = import_data('p232') #import a any dataset, to extract columns-formatting
-            X_per_sensor = pd.DataFrame(index = [''], columns = Y.columns)
-
-            # possible_thresholds_numbers = np.arange(3, 150, 0.5)
-            # #threshold_number = possible_thresholds_numbers[randrange(len(possible_thresholds_numbers))] 
-            # threshold_number = 1000
-            
+            X_per_sensor = pd.DataFrame(columns = Y.columns)
+           
+            for iii, leak in enumerate(leak_df['leak']): 
+                if leak == dataset:
+                    dataset_nr = iii
                 #no idea what these variables are typically called, but h = 0 first iteration, h = 1 second iteration and so on.
-            h = 1
+            h = leak_df.loc[dataset_nr]['h_number']
 
             while leak_found == False:
                 
                 #updates training and validation time each iteration of the while-loop, 
+                start_train_time = every_second_week[h-1]
+                #start_train_time = 0
+
                 train_time = every_second_week[h]
                 vald_time = every_second_week[h+1]
 
-                print(f'Training until: {train_time}, validation until: {vald_time}')
+                if h > leak_df.loc[dataset_nr]['h_stop']:
+                    leak_found = True
+                    leak_timestep = -9999
+                    break
 
+                print(f'Start training time:  {start_train_time}, training until: {train_time}, validation until: {vald_time}')
 
                 #if end of year and leak still not found.
                 if vald_time >= pd.to_datetime("2018-12-31 00:00:00"):
@@ -241,13 +288,15 @@ if __name__ == '__main__':
                 vald_time_int = time_df.loc[time_df['Timesteps'] == vald_time]
                 vald_time_int = int(vald_time_int.index.values)
 
-                #import the dataframe with the given dataset, and do a little data-preprocessing
+                #import the dataframe with the given dataset, and normalize
                 X = import_data(dataset)
                 X = X[:'2018-12-31']
                 X = (X - X[:train_time].mean())/X[:train_time].std() 
 
                 #training and validation data is extracted from X
-                X_train = X[:train_time]
+                X_train = X[start_train_time:train_time]
+                #X_train = X[:train_time]
+
                 X_val = X[train_time:vald_time]
                 xtr = torch.FloatTensor(X_train.values) 
                 xtv = torch.FloatTensor(X_val.values)
@@ -269,10 +318,10 @@ if __name__ == '__main__':
                 
                 #makes a copy of the X_test dataframe to have all the values set to zero, before later filling it from score functions
                 X_test_copy = X_test.copy() 
-                X_test_copy_v3 = X_test.copy()
+                #X_test_copy_v3 = X_test.copy()
+
                 for col in X_test_copy.columns:
                     X_test_copy[col].values[:] = 0
-                    X_test_copy_v3[col].values[:] = 0
 
                 #extract values from X_test to run through the model, normal score-function
                 iter_res = []
@@ -285,99 +334,35 @@ if __name__ == '__main__':
                 #fills up the aforementioned dataframe with the MSE per sensor
                 X_test_copy_filled = score_v2(xt, X_test_copy)
 
-                #briefly makes iter_res into a dataframe to utilize the .rolling method, and turning it back to a numpy array.
-                #might not be beneficial afterall, will require some testing
                 #    an idea for later; can remove seasonality from test/validation stage, then substract it from testing with some scaling factor depending on how far into the year it's gone
                 
-                # res_df = pd.DataFrame(data = iter_res)
-                # res_df = res_df.rolling(int(timesteps_in_day/4), min_periods= 1).mean()
-                # res_np = res_df.to_numpy()
-                # iter_res = res_np.reshape(len(res_np))
-
                     #get the numerical value for the beginning of the testing-time
                 h_time_holder_int = time_df.loc[time_df['Timesteps'] == time2]
                 h_time_holder_int = int(h_time_holder_int.index.values)
 
-                """"
-                    THRESHOLD:
-                    Since threshold depends on data from the prior two weeks, h > 1 is there to ensure that there's data to deduce threshold from.
-
-                    Likely to need further refinement at a later stage
-                    might miss it if there's a leak in the first week or two? --> may be some try - exception-python tricks to help -> do same thing on iter_res, but find out how works later
-                    renews each iteration as res' size increases with iter_res appended
-                    if 30% larger than last two weeks' maximum
-                    may be able to detect peak of the day the leak occurs, 
-                    but need comparison with similar time of day also for higher accuracy
-                    will only trigger at say 10-ish o'clock at peak water demand so to speak.
-                    but leak can occur any point during the day
-
-                    05/04: probably have to create multiple thresholds in order to search for specific types of leaks.
-            
-                """
- 
-                #threshold = []
+                X_per_sensor = pd.concat([X_per_sensor, X_test_copy_filled])
+                #X_per_sensor.to_csv(f'01_may_testing_{epochs}_bs{batch_size}_lr{learning_rate}_dataset{dataset}_.csv')
 
                 if h > 1:
-                    #print(f'this is res.max etc: {res[-num_days*timesteps_in_day:].max()}')                    
-                    #threshold = res[-num_days*timesteps_in_day:].max()*1.6
-                    # for col in (X_per_sensor.columns):
-                    #     #print(X_per_sensor[col][:-14*288].max())
-                    
-                    #     threshold.append(X_per_sensor[col][:-14*288].max())
-                    #     np.savetxt(f'threshold_{dataset}', np.array([threshold]))
-                    threshold = res[-num_days*timesteps_in_day:].max()*100000
-                    leak_counter = 0
-                    leak_col = []
+                    thres_results_df, leak_found, leak_timestep = threshold_function_v3(X_per_sensor, dataset, vald_time_int, comparison_number_multiplier, comparison_number_multiplier_v2)
 
-                    for it in range(len(iter_res)):
-                        if iter_res[it] > threshold: 
-                            leak_timestep_iter_res = it
-                            leak_found = True
-                            break
-
-                    # for i, col in enumerate(X_test_copy_filled.columns):
-                    #     #print(threshold)
-
-                    #     #print(f'{col}, {X_test_copy_filled[col].max()}')
-                        
-                    #     if X_test_copy_filled[col].max() > threshold[i]*threshold_number:
-                    #         leak_counter = 1 + leak_counter
-                    #         leak_col.append(col)
-
-                    #         if leak_counter > 5:
-
-                    #             it = X_test_copy_filled[col].idxmax()
-                    #             it = time_df.loc[time_df['Timesteps'] == it]
-                    #             leak_timestep_iter_res = int(it.index.values)
-                    #             leak_found = True
-
-                    #             break
-                
-
-                X_per_sensor = pd.concat([X_per_sensor, X_test_copy_filled])
-                X_per_sensor.to_csv(f'X_per_sensor_epochs{epochs}_bs{batch_size}_lr{learning_rate}_dataset{dataset}_1.csv')
-
-                        #iterates through the iteration_results variable to see if any occurence that exceeds the threshold has appeared
-                    # for it in range(len(iter_res)):
-                    #     if iter_res[it] > threshold: # or iter_res[:it].min() > lower_threshold  #or iter_res.min() > lower_threshold:
-                    #         leak_timestep_iter_res = it
-                    #         leak_found = True
-                    #         break
-                
                 #concatenate to res
                 res = np.concatenate([res, np.array(iter_res)])
-                np.savetxt(f'res_epochs{epochs}_bs{batch_size}_lr{learning_rate}_dataset{dataset}_1.csv', res, delimiter= ',')
+                #np.savetxt(f'res_epochs{epochs}_bs{batch_size}_lr{learning_rate}_dataset{dataset}_21_04.csv', res, delimiter= ',')
 
                 print(f'Leak found: {leak_found}')
 
-                if leak_found:
-                    #numerical value of the timestep in which leak_found became set to True
-                    
-                    leak_timestep = leak_timestep_iter_res + h_time_holder_int 
+                h = h + 1 
 
-                    # plt.plot(res)
-                    # plt.show()
-                    # plt.clf()
+                if leak_found:
+                    print(f'Leak is found : -), {dataset}')
+                    print(thres_results_df)
+                    
+                    #thres_results_df.to_csv(f'02_05_{kk}_{dataset}_{datetime.now().hour}_{datetime.now().minute}.csv')
+                    try:
+                        super_results.to_csv(f'{kk}_superresults_03_05_overnight_STD_testing.csv')
+                    except:
+                        pass
 
                             #saves a reconstruction plot with the learning and validation curves, similar as to shown before in the semester
                     #folder_recon_plot_path = folders[0]
@@ -386,80 +371,34 @@ if __name__ == '__main__':
                 else:
                     leak_timestep = 0
 
-                h = h + 1 
-
-                    #can be un-commented to see preliminary results through the year
-                # plt.plot(res)
-                # plt.show()
-                # plt.clf()
-
-                #similar as above, but comparison with x_test input and the MSE 
-            # for col in X_per_sensor:
-            #     to_plot = X_test_copy_filled[col].to_numpy()
-            #     #to_plot = X_per_sensor[col].to_numpy()
-            #     plt.plot(to_plot, label = col)
-            #     plt.title('MSE per sensor')
-            #     plt.legend()
-            #     plt.show()
-            #     plt.clf()
-
-            #     to_plotv2 = X_test[col].to_numpy()
-            #     plt.plot(to_plotv2, label = col)
-            #     plt.title('X_test, the regular inputbr')
-            #     plt.legend()
-            #     plt.show()
-            #     plt.clf()
-
 
                 #various model configuration information that's saved for later inspection
-            modeltxt = (f'Epochs: {epochs}, Learning rate: {learning_rate}, Batch_size: {batch_size}, Optimizer: {optimizer}, Loss function: {loss}, Dataset = {dataset} \n\n Model: {model}') 
-            modeltxt2 = (f'Training time ended at: {train_time}, validation time ended at: {vald_time}')
-            modeltxt_total = modeltxt + modeltxt2
-            txt_file = open(folders[3]+'\_'+str(kk)+'.txt', "w")
-            txt_file.write(modeltxt_total)
-            txt_file.close()
+            # modeltxt = (f'Epochs: {epochs}, Learning rate: {learning_rate}, Batch_size: {batch_size}, Optimizer: {optimizer}, Loss function: {loss}, Dataset = {dataset} \n\n Model: {model}') 
+            # modeltxt2 = (f'Training time ended at: {train_time}, validation time ended at: {vald_time}')
+            # modeltxt_total = modeltxt + modeltxt2
+            # txt_file = open(folders[3]+'\_'+str(kk)+'_12_04.txt', "w")
+            # txt_file.write(modeltxt_total)
+            # txt_file.close()
 
             #fills the time in which training and validation occured with 0s with goal of maintaining the datatimeindex on the x-axis in graph
             zero_array = np.zeros(shape = (vald_time_int, 1))
             res = np.append(zero_array, res)
 
             #dataframe of the results to be plotted in the leak_detection plot.
-
-            """
-                make into separate plotting function at some point
-            """
-            # res_df = pd.DataFrame(index = time_df['Timesteps'][:len(res)], columns=['res'], data = res)  #0s during the time spent training and validating
-            # fig = plt.figure(1, figsize = (14,6)) #gjorde dette en endring? fikk lagret en liten plot før
-
-            # colors = sns.color_palette("rocket", 10)
-            # for i, leak in enumerate(leak_df['leak']): 
-            #     if leak == dataset:  
-            #         #start and stop point of the given dataset's leak      
-            #         plt.plot(time_df.iloc[leak_df['start'][i]], 0, marker = 'X', color = colors[i], label = dataset, alpha = 0.8)
-            #         plt.plot(time_df.iloc[leak_df['stop'][i]], 0, marker = 's', color = colors[i], label = '', alpha = 0.8)
-
-            # plt.plot(time_df.iloc[leak_timestep], 0, marker = 'x', color = 'red', label = 'Detected leak', markersize=14)
-            # plt.plot(train_time, 0, marker = 'o', color = 'darkblue', label = 'end of start and validation time', alpha = 0.8)
-            # plt.plot(vald_time, 0, marker = 'o', color = 'darkblue', label = '', alpha = 0.8)
-
-            # plt.plot(res_df, color = 'darkgreen', label = 'Error')
-            # #plt.xlabel('')
-            # plt.ylabel('Reconstruction error')
-            # plt.legend()
-            #plt.show()
-                #saved to the appropriate folder                
-            #plt.savefig(folders[5]+ "\_"+ str(dataset) + "_" + (str(kk)))
-            #plt.clf()
-        
-            for iii, leak in enumerate(leak_df['leak']): 
-                if leak == dataset:
-                    dataset_nr = iii
-
-                #creates a dataframe in which to save results
-            super_results_holder = pd.DataFrame(index = [':)'], columns = ['Model iteration','Dataset','Time detected leak', 'Time true leak', 'Difference','Accumulated difference', 'Threshold'], data = 0)
+            #leak_location_plot(time_df, res, leak_df, leak_timestep, train_time, vald_time, folders, dataset, kk)
+            
+            
+             #har iikke giddet sjekket for bugs
+                    #creates a dataframe in which to save results
+            super_results_holder = pd.DataFrame(index = [':)'], columns = ['Model iteration','Dataset','Time detected leak', 'Time true leak', 'Difference','Accum. difference'], data = 0)
             super_results_holder['Model iteration'] = kk
             super_results_holder['Dataset'] = dataset
             super_results_holder['Time detected leak'] = leak_timestep
+            if leak_timestep != 0:
+                super_results_holder['Volume'] = leak_flows.iloc[leak_timestep][dataset]
+            else:
+                super_results_holder['Volume'] = -9999
+
             #super_results_holder['Threshold'] = threshold_number
             if no_leak_found:
                 super_results_holder['Time detected leak'] == -9999
@@ -467,25 +406,16 @@ if __name__ == '__main__':
             super_results_holder['Time true leak'] = leak_df['start'][dataset_nr]
 
             if no_leak_found == False:
-                acc_diff = abs(leak_timestep - leak_df['start'][dataset_nr]) + acc_diff
+                accumulated_diff = abs(leak_timestep - leak_df['start'][dataset_nr]) + accumulated_diff
 
             super_results_holder['Difference'] = (abs(leak_timestep - leak_df['start'][dataset_nr]))
-            super_results_holder['Accumulated difference'] = acc_diff
+            super_results_holder['Accum. difference'] = accumulated_diff
             super_results_holder['Running time 1 DS'] = str(datetime.now()-startTime)
+            super_results_holder['cmp_1'] = comparison_number_multiplier #for averages
+            super_results_holder['cmp_2'] = comparison_number_multiplier_v2 #for STDs
 
             super_results = pd.concat([super_results, super_results_holder])
 
             print(super_results)
-            super_results.to_csv(folders[2] +'\_' + (str(kk)) + '.csv')
-
-
-
-
-
-
-
-
-
-
-
-
+            super_results.to_csv(folders[2] +'\_02_may_testing_' + (str(kk)) + '.csv')
+          
