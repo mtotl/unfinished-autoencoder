@@ -433,7 +433,7 @@ def threshold_function_v2(X_per_sensor, dataset, vald_time_int, comparison_numbe
             #ordnet at start er ved 0 for slow increase
             #ikke enda ordnet for incipient
         try:    #leak time numeric ikke helt ok for sakte voksende?, burde heller bare si at hvis len(biggest cluster) større enn 5 eller noe
-            if math.isclose(leak_timestep, leak_df_modified.loc[dataset]['leak time numeric'], abs_tol=288*28) and len(biggest_cluster) > 3: 
+            if math.isclose(leak_timestep, leak_df_modified.loc[dataset]['leak time numeric'], abs_tol=288*28*2) and len(biggest_cluster) >= 3: 
                 leak_found = True
             else:
                 leak_found = False
@@ -572,18 +572,6 @@ def threshold_function_v3(X_per_sensor, dataset, vald_time_int, comparison_numbe
             
         #prelim_results_dataframe.to_csv(f'{round(comparison_number_multiplier,2), round(comparison_number_multiplier_v2,2)}_prelimresults.csv')
     return prelim_results_dataframe, leak_found, leak_timestep
-
-
-
-
-
-
-
-
-
-
-
-
 
 def leak_location_plot(time_df, res, leak_df, leak_timestep, train_time, vald_time, folders, dataset, kk):
     res_df = pd.DataFrame(index = time_df['Timesteps'][:len(res)], columns=['res'], data = res)  #0s during the time spent training and validating

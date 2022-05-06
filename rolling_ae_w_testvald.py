@@ -164,10 +164,15 @@ if __name__ == '__main__':
     #some_abrupt_burst_datasets = ['p257', 'p427', 'p654', 'p810'] # kjør disse etterpå
 
     #for p628,  gjør en vurdering om hvilke sensorer som detekterer først, tror ikke nærmeste slår helt ut alene
-    #some_abrupt_burst_datasets = ['p538','p158','p461','p31','p183','p866','p628','p369','p232']
-    some_abrupt_burst_datasets = ['p232']
+    some_abrupt_burst_datasets = ['p538','p158','p461','p31','p183','p866','p628','p369','p232']
+    #some_abrupt_burst_datasets = ['p232']
     #dataframe to keep the total results, the preliminary results are concatenated to each iteration
     super_results = pd.DataFrame(index = [':)'], columns = ['Model iteration','Dataset','Time detected leak', 'Time true leak', 'Difference','Accum. difference'], data = 0)
+
+    #test om mlig med np.ones(shape(1, 20000000)) * AutoEncoder_6
+    all_datasets = ['p158', 'p183', 'p369', 'p538', 'p673', 'p866','p232','p461','p628','p31','p257', 'p427', 'p654', 'p810']
+
+    models_container = [AutoEncoder_6 for i in range (len(all_datasets))]
 
     for kk in range(20000):
 
@@ -204,17 +209,9 @@ if __name__ == '__main__':
         number_of_neurons = 36
         #model = possible_models[randrange(len(possible_models))]
         #model = model(len(X_train.columns))
-        model = AutoEncoder_6(number_of_neurons)
-        print(model)
+        #model = AutoEncoder_6(number_of_neurons)
+        #print(model)
 
-        adam = torch.optim.Adam(model.parameters(), lr = learning_rate)
-        adamW = torch.optim.AdamW(model.parameters(), lr = learning_rate)
-        nadam = torch.optim.NAdam(model.parameters(), lr = learning_rate)
-        adamax = torch.optim.Adamax(model.parameters(), lr = learning_rate)
-
-        possible_optimizers = [adam, adamW, nadam, adamax]
-        #optimizer = possible_optimizers[randrange(len(possible_optimizers))]  
-        optimizer = adam #used nadam for the _correct_versions
 
             #starting point of the accumulated timestep difference, ideally a configuration has a low accumulation of timestep difference
             #between the detected leak location and the true leak location, although this criteria has its drawbacks, 
@@ -229,9 +226,23 @@ if __name__ == '__main__':
         comparison_number_multiplier = 1
         comparison_number_multiplier_v2 = possible_multipliers_v2[kk]
         
-        #comparison_number_multiplier_v2 = 1.15
+        comparison_number_multiplier_v2 = 2.75
 
-        for dataset_number, dataset in enumerate(some_abrupt_burst_datasets):
+        for dataset_number, dataset in enumerate(all_datasets):
+
+            model = models_container[dataset_number](number_of_neurons)
+            print(model)
+
+            adam = torch.optim.Adam(model.parameters(), lr = learning_rate)
+            adamW = torch.optim.AdamW(model.parameters(), lr = learning_rate)
+            nadam = torch.optim.NAdam(model.parameters(), lr = learning_rate)
+            adamax = torch.optim.Adamax(model.parameters(), lr = learning_rate)
+
+            possible_optimizers = [adam, adamW, nadam, adamax]
+            #optimizer = possible_optimizers[randrange(len(possible_optimizers))]  
+            optimizer = adam #used nadam for the _correct_versions
+
+
             res = np.array([]) 
 
             leak_found = False
